@@ -6,7 +6,7 @@
 	<string>development</string>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
-		<string>applinks:</string>
+		<string>applinks:app.datasrc.matewalk.club</string>
 	</array>
 </dict>
 </plist>
