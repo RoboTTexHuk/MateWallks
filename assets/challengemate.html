@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Challengemate</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script> window.FontAwesomeConfig = { autoReplaceSvg: 'nest'};</script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdn.plot.ly/plotly-3.1.1.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#a3e635', // lime-400
+                        secondary: '#1e293b', // slate-800
+                        dark: '#0f172a', // slate-900
+                        accent: '#22c55e', // green-500
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
+        ::-webkit-scrollbar { display: none; }
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        /* Tab navigation active state */
+        .tab-btn.active { color: #a3e635; }
+        .tab-btn.active i { transform: scale(1.1); transition: all 0.2s; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .star-btn { cursor: pointer; transition: transform 0.1s; }
+        .star-btn:hover { transform: scale(1.2); }
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(15, 23, 42, 0.85);
+            display: flex; align-items: flex-end; justify-content: center; z-index: 50;
+            opacity: 0; pointer-events: none; transition: opacity 0.2s;
+        }
+        .modal-overlay.open { opacity: 1; pointer-events: auto; }
+        .modal-sheet {
+            width: 100%; max-height: 88vh; overflow-y: auto;
+            transform: translateY(100%); transition: transform 0.25s ease-out;
+        }
+        .modal-overlay.open .modal-sheet { transform: translateY(0); }
+        .toast {
+            position: fixed; bottom: 95px; left: 50%; transform: translateX(-50%) translateY(20px);
+            background: #a3e635; color: #0f172a; font-weight: 700; font-size: 13px;
+            padding: 10px 18px; border-radius: 999px; z-index: 60; opacity: 0;
+            transition: all 0.25s ease; pointer-events: none; white-space: nowrap;
+            box-shadow: 0 4px 20px rgba(163,230,53,0.4);
+        }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .lang-btn.active { background: #a3e635; color: #0f172a; }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden relative pb-[80px]">
+
+    <!-- Header -->
+    <header class="flex items-center justify-between px-4 py-4 bg-secondary shadow-lg z-20">
+        <div class="flex items-center gap-3 border border-gray-700 rounded-full px-4 py-2 bg-dark">
+            <i class="fa-solid fa-shoe-prints text-primary text-xl"></i>
+            <span class="font-bold text-lg tracking-tight text-white italic">Challengemate</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <div class="flex bg-dark border border-gray-700 rounded-full p-0.5 text-[11px] font-bold">
+                <button id="lang-en" class="lang-btn px-2.5 py-1 rounded-full text-gray-400" onclick="setLang('en')">EN</button>
+                <button id="lang-ru" class="lang-btn px-2.5 py-1 rounded-full text-gray-400" onclick="setLang('ru')">RU</button>
+            </div>
+            <button class="w-10 h-10 rounded-full bg-dark flex items-center justify-center border border-gray-700 overflow-hidden" onclick="switchTabById('tab-profile')">
+                <img id="header-avatar" src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-4.jpg" alt="Profile" class="w-full h-full rounded-full object-cover">
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-y-auto w-full relative z-10" id="main-content">
+
+        <!-- Tab 1: Challenges -->
+        <section id="tab-challenges" class="tab-content active w-full px-4 py-6">
+            <div class="relative w-full rounded-2xl overflow-hidden mb-6 h-48 shadow-xl">
+                <img class="w-full h-full object-cover" src="https://storage.googleapis.com/uxpilot-auth.appspot.com/gen_c34a493ff6_cc85322838052073.png" alt="two friends walking and laughing in a sunny park" />
+                <div class="absolute inset-0 bg-gradient-to-r from-dark/90 to-transparent flex flex-col justify-center px-6">
+                    <h2 class="text-2xl font-extrabold text-white mb-2 leading-tight" id="hero-title"></h2>
+                    <p class="text-sm text-gray-300 max-w-[200px]" id="hero-desc"></p>
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-white" id="ideas-title"></h3>
+                <button id="btn-regenerate" class="bg-primary text-dark font-bold px-4 py-2 rounded-full text-sm hover:bg-lime-300 transition-colors shadow-[0_0_15px_rgba(163,230,53,0.3)]">
+                    <i class="fa-solid fa-rotate-right mr-1"></i> <span id="refresh-label"></span>
+                </button>
+            </div>
+
+            <div id="challenges-list" class="grid grid-cols-1 gap-3 pb-6"></div>
+        </section>
+
+        <!-- Tab 2: Log -->
+        <section id="tab-log" class="tab-content w-full px-4 py-6">
+            <h2 class="text-2xl font-extrabold text-white mb-6" id="log-title"></h2>
+            <div id="log-list" class="flex flex-col gap-4 pb-6"></div>
+            <div id="log-empty" class="hidden text-center text-gray-400 text-sm py-10">
+                <i class="fa-solid fa-book-open text-3xl mb-3 text-gray-600"></i>
+                <p id="log-empty-text"></p>
+            </div>
+        </section>
+
+        <!-- Tab 3: Stats -->
+        <section id="tab-stats" class="tab-content w-full px-4 py-6">
+            <h2 class="text-2xl font-extrabold text-white mb-6"><span id="stats-title"></span></h2>
+
+            <div class="grid grid-cols-2 gap-3 mb-6">
+                <div class="glass-panel rounded-xl p-4 text-center">
+                    <div class="text-3xl font-extrabold text-primary" id="stat-total">0</div>
+                    <div class="text-xs text-gray-400 mt-1" id="stat-total-label"></div>
+                </div>
+                <div class="glass-panel rounded-xl p-4 text-center">
+                    <div class="text-3xl font-extrabold text-primary" id="stat-streak">0</div>
+                    <div class="text-xs text-gray-400 mt-1" id="stat-streak-label"></div>
+                </div>
+            </div>
+
+            <div class="glass-panel rounded-xl p-3 mb-6">
+                <h4 class="text-sm font-bold text-white mb-2 px-1" id="stat-rating-dist-title"></h4>
+                <div id="chart-ratings" style="width:100%; height:200px;"></div>
+            </div>
+
+            <div class="glass-panel rounded-xl p-3 mb-6">
+                <h4 class="text-sm font-bold text-white mb-2 px-1" id="stat-timeline-title"></h4>
+                <div id="chart-timeline" style="width:100%; height:200px;"></div>
+            </div>
+
+            <div class="mb-6">
+                <h4 class="text-sm font-bold text-white mb-3 px-1" id="stat-top-rated-title"></h4>
+                <div id="top-rated-list" class="flex flex-col gap-2"></div>
+                <p id="top-rated-empty" class="hidden text-center text-gray-400 text-sm py-4"></p>
+            </div>
+        </section>
+
+        <!-- Tab 4: Profile -->
+        <section id="tab-profile" class="tab-content w-full px-4 py-6">
+            <h2 class="text-2xl font-extrabold text-white mb-6" id="profile-title"></h2>
+
+            <div class="flex flex-col items-center mb-6">
+                <div class="relative">
+                    <img id="profile-avatar-big" src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-4.jpg" class="w-24 h-24 rounded-full object-cover border-2 border-primary">
+                    <button onclick="document.getElementById('avatar-input').click()" class="absolute bottom-0 right-0 w-8 h-8 bg-primary rounded-full flex items-center justify-center text-dark border-2 border-dark">
+                        <i class="fa-solid fa-camera text-xs"></i>
+                    </button>
+                    <input type="file" id="avatar-input" accept="image/*" class="hidden" onchange="onAvatarChange(this)">
+                </div>
+
+                <input id="profile-name" class="mt-4 bg-transparent text-center text-xl font-extrabold text-white border-b border-transparent focus:border-primary outline-none px-2 py-1" placeholder="Your name">
+
+                <input id="profile-status" class="mt-2 bg-dark border border-gray-700 rounded-full text-center text-sm text-primary px-4 py-2 outline-none focus:border-primary w-full max-w-xs" placeholder="Mate status">
+            </div>
+
+            <div class="grid grid-cols-3 gap-3 mb-6">
+                <div class="glass-panel rounded-xl p-3 text-center">
+                    <div class="text-xl font-extrabold text-primary" id="profile-total">0</div>
+                    <div class="text-[10px] text-gray-400 mt-1" id="profile-total-label"></div>
+                </div>
+                <div class="glass-panel rounded-xl p-3 text-center">
+                    <div class="text-xl font-extrabold text-primary" id="profile-avg">0.0</div>
+                    <div class="text-[10px] text-gray-400 mt-1" id="profile-avg-label"></div>
+                </div>
+                <div class="glass-panel rounded-xl p-3 text-center">
+                    <div class="text-xl font-extrabold text-primary"><i class="fa-solid fa-fire"></i> <span id="profile-streak">0</span></div>
+                    <div class="text-[10px] text-gray-400 mt-1" id="profile-streak-label"></div>
+                </div>
+            </div>
+
+            <div class="glass-panel rounded-xl p-4">
+                <h4 class="text-sm font-bold text-white mb-2" id="profile-fav-label"></h4>
+                <p class="text-sm text-gray-300" id="profile-fav-value"></p>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Entry Detail Modal -->
+    <div id="entry-modal" class="modal-overlay" onclick="if(event.target===this) closeModal()">
+        <div class="modal-sheet glass-panel rounded-t-3xl p-5">
+            <div class="w-10 h-1.5 bg-gray-600 rounded-full mx-auto mb-4"></div>
+            <h3 class="text-lg font-extrabold text-white mb-1" id="modal-challenge-title"></h3>
+            <p class="text-xs text-gray-400 mb-4" id="modal-challenge-date"></p>
+
+            <div class="flex items-center justify-between mb-4">
+                <span class="text-sm font-medium text-gray-300" id="modal-done-label"></span>
+                <button id="modal-done-toggle" onclick="toggleModalDone()" class="px-4 py-2 rounded-full text-xs font-bold"></button>
+            </div>
+
+            <div class="mb-4">
+                <p class="text-sm font-medium text-gray-300 mb-2" id="modal-rating-label"></p>
+                <div id="modal-stars" class="flex gap-2 text-2xl text-yellow-400"></div>
+            </div>
+
+            <div class="mb-4">
+                <p class="text-sm font-medium text-gray-300 mb-2" id="modal-note-label"></p>
+                <textarea id="modal-note" rows="3" class="w-full bg-dark border border-gray-700 rounded-xl p-3 text-sm text-white outline-none focus:border-primary resize-none"></textarea>
+            </div>
+
+            <div class="mb-6">
+                <p class="text-sm font-medium text-gray-300 mb-2" id="modal-photo-label"></p>
+                <div id="modal-photo-preview" class="w-full h-36 rounded-xl bg-dark border border-gray-700 border-dashed flex items-center justify-center overflow-hidden cursor-pointer" onclick="document.getElementById('modal-photo-input').click()">
+                    <i class="fa-solid fa-camera text-gray-500 text-2xl"></i>
+                </div>
+                <input type="file" id="modal-photo-input" accept="image/*" capture="environment" class="hidden" onchange="onModalPhotoChange(this)">
+            </div>
+
+            <div class="flex gap-3">
+                <button onclick="deleteModalEntry()" class="flex-1 bg-red-500/20 text-red-400 font-bold py-3 rounded-full text-sm">
+                    <i class="fa-solid fa-trash mr-1"></i> <span id="modal-delete-label"></span>
+                </button>
+                <button onclick="saveModalEntry()" class="flex-1 bg-primary text-dark font-bold py-3 rounded-full text-sm">
+                    <span id="modal-save-label"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <!-- Bottom Navigation -->
+    <nav class="absolute bottom-0 w-full bg-secondary border-t border-gray-700 z-30 pb-safe">
+        <div class="flex justify-around items-center h-[80px] px-2">
+            <button class="tab-btn active flex flex-col items-center justify-center w-16 h-full text-gray-400" onclick="switchTab('tab-challenges', this)">
+                <i class="fa-solid fa-compass text-xl mb-1"></i>
+                <span class="text-[10px] font-medium nav-label" data-key="navChallenges"></span>
+            </button>
+            <button class="tab-btn flex flex-col items-center justify-center w-16 h-full text-gray-400" onclick="switchTab('tab-log', this)">
+                <i class="fa-solid fa-book text-xl mb-1"></i>
+                <span class="text-[10px] font-medium nav-label" data-key="navLog"></span>
+            </button>
+            <button class="tab-btn flex flex-col items-center justify-center w-16 h-full text-gray-400" onclick="switchTab('tab-stats', this)">
+                <i class="fa-solid fa-chart-simple text-xl mb-1"></i>
+                <span class="text-[10px] font-medium nav-label" data-key="navStats"></span>
+            </button>
+            <button class="tab-btn flex flex-col items-center justify-center w-16 h-full text-gray-400" onclick="switchTab('tab-profile', this)">
+                <i class="fa-solid fa-user text-xl mb-1"></i>
+                <span class="text-[10px] font-medium nav-label" data-key="navProfile"></span>
+            </button>
+        </div>
+    </nav>
+
+<script>
+/* =========================================================
+   CHALLENGEMATE — full app logic (localStorage persistence)
+   ========================================================= */
+
+/* ---------- i18n ---------- */
+const STR = {
+    en: {
+        navChallenges: 'Challenges', navLog: 'Log', navStats: 'Stats', navProfile: 'Profile',
+        heroTitle1: 'Ready for a', heroTitle2: 'Walk Challenge?',
+        heroDesc: "Spice up your stroll with these quick missions.",
+        ideasToday: 'Ideas for today', refresh: 'Refresh',
+        selectedInProgress: 'Selected • In progress',
+        completed: 'Completed', withMate: 'w/',
+        logTitle: 'Activity Log', logEmpty: "No challenges logged yet. Add one from the Challenges tab!",
+        today: 'Today', yesterday: 'Yesterday',
+        modalDoneLabel: 'Mark as completed', markDone: 'Completed', markPlanned: 'Planned',
+        modalRatingLabel: 'Your rating', modalNoteLabel: 'How did it go?',
+        notePlaceholder: "What was funny, hard, or great about it...",
+        modalPhotoLabel: 'Photo', save: 'Save', delete: 'Delete', cancel: 'Cancel',
+        statsTitle: 'Stats', statTotalLabel: 'Completed', statStreakLabel: 'Day streak',
+        statRatingDist: 'Rating distribution', statTimeline: 'Completed over last 14 days',
+        statTopRated: 'Top rated challenges', topRatedEmpty: 'Rate some challenges 4-5 stars to see them here.',
+        profileTitle: 'Profile', namePlaceholder: 'Your name', statusPlaceholder: 'Mate status, e.g. "Walking with Alex"',
+        profileTotalLabel: 'Done', profileAvgLabel: 'Avg ★', profileStreakLabel: 'Streak',
+        profileFavLabel: 'Favorite challenge', noFavorite: 'Complete and rate a challenge to see your favorite here.',
+        toastAdded: 'Added to log', toastRemoved: 'Removed from log', toastSaved: 'Saved', toastDeleted: 'Entry deleted',
+        defaultMate: 'Mate Walker', defaultStatus: 'Looking for a mate',
+    },
+    ru: {
+        navChallenges: 'Челленджи', navLog: 'Журнал', navStats: 'Статистика', navProfile: 'Профиль',
+        heroTitle1: 'Готов к', heroTitle2: 'Прогулочному челленджу?',
+        heroDesc: 'Сделай свою прогулку веселее с этими быстрыми миссиями.',
+        ideasToday: 'Идеи на сегодня', refresh: 'Обновить',
+        selectedInProgress: 'Выбрано • В процессе',
+        completed: 'Выполнено', withMate: 'с',
+        logTitle: 'Журнал активностей', logEmpty: 'Пока нет записей. Добавь челлендж на вкладке «Челленджи»!',
+        today: 'Сегодня', yesterday: 'Вчера',
+        modalDoneLabel: 'Отметить как выполнено', markDone: 'Выполнено', markPlanned: 'Запланировано',
+        modalRatingLabel: 'Твоя оценка', modalNoteLabel: 'Как всё прошло?',
+        notePlaceholder: 'Что было смешным, сложным или классным...',
+        modalPhotoLabel: 'Фото', save: 'Сохранить', delete: 'Удалить', cancel: 'Отмена',
+        statsTitle: 'Статистика', statTotalLabel: 'Выполнено', statStreakLabel: 'Дней подряд',
+        statRatingDist: 'Распределение оценок', statTimeline: 'Выполнено за последние 14 дней',
+        statTopRated: 'Лучшие челленджи', topRatedEmpty: 'Оцени челленджи на 4-5 звёзд, чтобы увидеть их здесь.',
+        profileTitle: 'Профиль', namePlaceholder: 'Твоё имя', statusPlaceholder: 'Mate статус, например «Гуляю с Alex»',
+        profileTotalLabel: 'Сделано', profileAvgLabel: 'Средняя ★', profileStreakLabel: 'Серия',
+        profileFavLabel: 'Любимый челлендж', noFavorite: 'Выполни и оцени челлендж, чтобы увидеть здесь любимый.',
+        toastAdded: 'Добавлено в журнал', toastRemoved: 'Удалено из журнала', toastSaved: 'Сохранено', toastDeleted: 'Запись удалена',
+        defaultMate: 'Mate Walker', defaultStatus: 'Ищу приятеля',
+    }
+};
+
+let LANG = localStorage.getItem('cm_lang') || (navigator.language && navigator.language.startsWith('ru') ? 'ru' : 'en');
+function t(key) { return (STR[LANG] && STR[LANG][key]) || STR.en[key] || key; }
+
+/* ---------- Challenge pool ---------- */
+const POOL = [
+    { id: 1,  icon: 'fa-solid fa-cat', en: ['Selfie with a street cat', "Bonus points if it's ginger!"], ru: ['Сделай селфи с уличным котом', 'Бонусные баллы, если он рыжий!'] },
+    { id: 2,  icon: 'fa-solid fa-person-running', en: ['Race to the next bench', 'Loser buys the coffee.'], ru: ['Добеги до следующей скамейки', 'Проигравший покупает кофе.'] },
+    { id: 3,  icon: 'fa-solid fa-door-closed', en: ['Find a red door', 'Snap a photo as proof.'], ru: ['Найди красную дверь', 'Сделай фото в доказательство.'] },
+    { id: 4,  icon: 'fa-solid fa-backward', en: ['Walk backwards 10 steps', "Don't trip!"], ru: ['Пройди 10 шагов назад', 'Не споткнись!'] },
+    { id: 5,  icon: 'fa-solid fa-leaf', en: ['Collect 3 different leaves', 'Compare shapes with your mate.'], ru: ['Собери 3 разных листика', 'Сравните формы с приятелем.'] },
+    { id: 6,  icon: 'fa-solid fa-comments', en: ['Talk to a stranger', 'Just say hi and smile.'], ru: ['Поговори с незнакомцем', 'Просто скажи привет и улыбнись.'] },
+    { id: 7,  icon: 'fa-solid fa-music', en: ['Hum a song for 30 seconds', 'Mate has to guess it.'], ru: ['Напевай песню 30 секунд', 'Приятель должен угадать.'] },
+    { id: 8,  icon: 'fa-solid fa-shoe-prints', en: ['Walk on tiptoes for 20 steps', 'Balance check!'], ru: ['Пройди 20 шагов на носочках', 'Проверка баланса!'] },
+    { id: 9,  icon: 'fa-solid fa-camera-retro', en: ['Take a photo of something blue', 'First thing you see.'], ru: ['Сфотографируй что-то синее', 'Первое, что увидишь.'] },
+    { id: 10, icon: 'fa-solid fa-face-laugh-beam', en: ['Make your mate laugh', 'No tickling allowed.'], ru: ['Заставь приятеля посмеяться', 'Щекотка запрещена.'] },
+    { id: 11, icon: 'fa-solid fa-tree', en: ['Hug a tree', 'The bigger the better.'], ru: ['Обними дерево', 'Чем больше, тем лучше.'] },
+    { id: 12, icon: 'fa-solid fa-mug-hot', en: ['Find the nearest coffee spot', 'Just look, no buying required.'], ru: ['Найди ближайшую кофейню', 'Просто посмотри, покупать не обязательно.'] },
+    { id: 13, icon: 'fa-solid fa-paw', en: ['Spot 3 dogs on your walk', 'Bonus for puppies.'], ru: ['Заметь 3 собаки на прогулке', 'Бонус за щенков.'] },
+    { id: 14, icon: 'fa-solid fa-bicycle', en: ['Count passing bicycles for 1 minute', 'Compare counts with your mate.'], ru: ['Посчитай велосипеды за 1 минуту', 'Сравните счёт с приятелем.'] },
+    { id: 15, icon: 'fa-solid fa-cloud-sun', en: ['Find a cloud shaped like an animal', 'Use your imagination.'], ru: ['Найди облако в форме животного', 'Включи воображение.'] },
+    { id: 16, icon: 'fa-solid fa-route', en: ['Take a completely new route', 'Get a little lost.'], ru: ['Пройди совсем новым маршрутом', 'Немного заблудитесь.'] },
+    { id: 17, icon: 'fa-solid fa-volume-low', en: ['Whisper for 5 minutes straight', 'No matter what.'], ru: ['Говори шёпотом 5 минут', 'Что бы ни случилось.'] },
+    { id: 18, icon: 'fa-solid fa-hand-peace', en: ['Give a stranger a compliment', 'Keep it kind.'], ru: ['Сделай незнакомцу комплимент', 'Будь добрым.'] },
+    { id: 19, icon: 'fa-solid fa-stairs', en: ['Find and climb a staircase', 'Any staircase counts.'], ru: ['Найди и поднимись по лестнице', 'Любая лестница подойдёт.'] },
+    { id: 20, icon: 'fa-solid fa-feather', en: ['Find a feather on the ground', "Nature's gift."], ru: ['Найди перо на земле', 'Подарок природы.'] },
+    { id: 21, icon: 'fa-solid fa-couch', en: ['Sit on a bench for 1 minute in silence', 'Just breathe.'], ru: ['Посиди на скамейке 1 минуту в тишине', 'Просто дыши.'] },
+    { id: 22, icon: 'fa-solid fa-star', en: ['Name 3 wishes out loud', 'Dream big.'], ru: ['Назови вслух 3 желания', 'Мечтай масштабно.'] },
+    { id: 23, icon: 'fa-solid fa-mask', en: ['Make a funny face for a photo', 'The sillier the better.'], ru: ['Сделай смешное лицо для фото', 'Чем нелепее, тем лучше.'] },
+    { id: 24, icon: 'fa-solid fa-heart', en: ['Tell your mate one thing you appreciate about them', 'Be genuine.'], ru: ['Скажи приятелю, что ты в нём ценишь', 'Будь искренним.'] },
+];
+
+/* ---------- Storage helpers ---------- */
+const DB = {
+    get(key, fallback) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; } },
+    set(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
+};
+
+let todayChallengeIds = DB.get('cm_today_ids', null);
+let log = DB.get('cm_log', []);
+let profile = DB.get('cm_profile', { name: '', status: '', avatar: '' });
+
+function pickRandom(n) {
+    const shuffled = [...POOL].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, n).map(c => c.id);
+}
+if (!todayChallengeIds || !todayChallengeIds.length) {
+    todayChallengeIds = pickRandom(10);
+    DB.set('cm_today_ids', todayChallengeIds);
+}
+
+function findChallenge(id) { return POOL.find(c => c.id === id); }
+function challengeText(c) { return LANG === 'ru' ? c.ru : c.en; }
+
+/* ---------- Toast ---------- */
+let toastTimer = null;
+function showToast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
+}
+
+/* ---------- Tabs ---------- */
+function switchTab(tabId, btnElement) {
+    document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    const selectedTab = document.getElementById(tabId);
+    if (selectedTab) selectedTab.classList.add('active');
+    if (btnElement) btnElement.classList.add('active');
+    renderAll();
+}
+function switchTabById(tabId) {
+    const idx = { 'tab-challenges': 0, 'tab-log': 1, 'tab-stats': 2, 'tab-profile': 3 }[tabId];
+    const btn = document.querySelectorAll('.tab-btn')[idx];
+    switchTab(tabId, btn);
+}
+
+/* ---------- Language ---------- */
+function setLang(lang) {
+    LANG = lang;
+    localStorage.setItem('cm_lang', lang);
+    renderAll();
+}
+function applyStaticText() {
+    document.getElementById('hero-title').innerHTML = `${t('heroTitle1')}<br><span class="text-primary">${t('heroTitle2')}</span>`;
+    document.getElementById('hero-desc').textContent = t('heroDesc');
+    document.getElementById('ideas-title').textContent = t('ideasToday');
+    document.getElementById('refresh-label').textContent = t('refresh');
+    document.getElementById('log-title').textContent = t('logTitle');
+    document.getElementById('log-empty-text').textContent = t('logEmpty');
+    document.getElementById('stats-title').textContent = t('statsTitle');
+    document.getElementById('stat-total-label').textContent = t('statTotalLabel');
+    document.getElementById('stat-streak-label').textContent = t('statStreakLabel');
+    document.getElementById('stat-rating-dist-title').textContent = t('statRatingDist');
+    document.getElementById('stat-timeline-title').textContent = t('statTimeline');
+    document.getElementById('stat-top-rated-title').textContent = t('statTopRated');
+    document.getElementById('top-rated-empty').textContent = t('topRatedEmpty');
+    document.getElementById('profile-title').textContent = t('profileTitle');
+    document.getElementById('profile-name').placeholder = t('namePlaceholder');
+    document.getElementById('profile-status').placeholder = t('statusPlaceholder');
+    document.getElementById('profile-total-label').textContent = t('profileTotalLabel');
+    document.getElementById('profile-avg-label').textContent = t('profileAvgLabel');
+    document.getElementById('profile-streak-label').textContent = t('profileStreakLabel');
+    document.getElementById('profile-fav-label').textContent = t('profileFavLabel');
+    document.getElementById('modal-done-label').textContent = t('modalDoneLabel');
+    document.getElementById('modal-rating-label').textContent = t('modalRatingLabel');
+    document.getElementById('modal-note-label').textContent = t('modalNoteLabel');
+    document.getElementById('modal-note').placeholder = t('notePlaceholder');
+    document.getElementById('modal-photo-label').textContent = t('modalPhotoLabel');
+    document.getElementById('modal-delete-label').textContent = t('delete');
+    document.getElementById('modal-save-label').textContent = t('save');
+    document.querySelectorAll('.nav-label').forEach(el => el.textContent = t(el.dataset.key));
+    document.getElementById('lang-en').classList.toggle('active', LANG === 'en');
+    document.getElementById('lang-ru').classList.toggle('active', LANG === 'ru');
+    document.documentElement.lang = LANG;
+}
+
+/* ---------- Stars render helper ---------- */
+function starsHtml(rating, size = 'text-sm') {
+    let html = '';
+    for (let i = 1; i <= 5; i++) {
+        html += `<i class="${i <= rating ? 'fa-solid' : 'fa-regular'} fa-star ${size} ${i <= rating ? 'text-yellow-400' : 'text-gray-600'}"></i>`;
+    }
+    return html;
+}
+
+/* ---------- Challenges tab ---------- */
+function isInLog(challengeId) { return log.some(e => e.challengeId === challengeId); }
+
+function renderChallenges() {
+    const container = document.getElementById('challenges-list');
+    container.innerHTML = '';
+    todayChallengeIds.forEach(id => {
+        const c = findChallenge(id);
+        if (!c) return;
+        const [title, desc] = challengeText(c);
+        const active = isInLog(id);
+        const card = document.createElement('div');
+        card.className = `glass-panel p-4 rounded-xl flex items-center justify-between active:scale-95 transition-transform cursor-pointer ${active ? 'border border-primary/50 shadow-[0_0_10px_rgba(163,230,53,0.1)]' : ''}`;
+        card.innerHTML = `
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-full ${active ? 'bg-primary text-dark' : 'bg-slate-700 text-primary'} flex items-center justify-center text-xl">
+                    <i class="${c.icon}"></i>
+                </div>
+                <div>
+                    <h4 class="font-bold text-white text-base">${title}</h4>
+                    <p class="text-xs ${active ? 'text-primary' : 'text-gray-400'}">${active ? t('selectedInProgress') : desc}</p>
+                </div>
+            </div>
+            <button class="w-8 h-8 rounded-full ${active ? 'bg-primary border-primary text-dark' : 'bg-dark border border-gray-600 text-gray-400'} flex items-center justify-center" onclick="toggleChallenge(${id}, event)">
+                <i class="fa-solid ${active ? 'fa-check' : 'fa-plus'}"></i>
+            </button>`;
+        container.appendChild(card);
+    });
+}
+
+function toggleChallenge(id, ev) {
+    if (ev) ev.stopPropagation();
+    const existingIdx = log.findIndex(e => e.challengeId === id);
+    if (existingIdx >= 0) {
+        log.splice(existingIdx, 1);
+        showToast(t('toastRemoved'));
+    } else {
+        const c = findChallenge(id);
+        const [title] = challengeText(c);
+        log.unshift({
+            id: Date.now() + Math.random(),
+            challengeId: id,
+            title, icon: c.icon,
+            date: new Date().toISOString(),
+            done: true, rating: 0, note: '', photo: '', mate: profile.status || ''
+        });
+        showToast(t('toastAdded'));
+    }
+    DB.set('cm_log', log);
+    renderAll();
+}
+
+document.getElementById('btn-regenerate').addEventListener('click', () => {
+    todayChallengeIds = pickRandom(10);
+    DB.set('cm_today_ids', todayChallengeIds);
+    renderChallenges();
+});
+
+/* ---------- Log tab ---------- */
+function relativeDateLabel(iso) {
+    const d = new Date(iso), now = new Date();
+    const sameDay = d.toDateString() === now.toDateString();
+    const yest = new Date(now); yest.setDate(now.getDate() - 1);
+    const time = d.toLocaleTimeString(LANG === 'ru' ? 'ru-RU' : 'en-US', { hour: 'numeric', minute: '2-digit' });
+    if (sameDay) return `${t('today')}, ${time}`;
+    if (d.toDateString() === yest.toDateString()) return `${t('yesterday')}, ${time}`;
+    return d.toLocaleDateString(LANG === 'ru' ? 'ru-RU' : 'en-US', { day: 'numeric', month: 'short' }) + `, ${time}`;
+}
+
+function renderLog() {
+    const container = document.getElementById('log-list');
+    const empty = document.getElementById('log-empty');
+    container.innerHTML = '';
+    if (!log.length) { empty.classList.remove('hidden'); return; }
+    empty.classList.add('hidden');
+    log.forEach(entry => {
+        const card = document.createElement('div');
+        card.className = 'glass-panel rounded-2xl overflow-hidden relative cursor-pointer';
+        card.onclick = () => openModal(entry.id);
+        card.innerHTML = `
+            ${entry.rating ? `<div class="absolute top-3 right-3 z-10 flex gap-1 bg-dark/80 px-2 py-1 rounded-full text-xs">${starsHtml(entry.rating)}</div>` : ''}
+            ${entry.photo ? `<div class="h-32 w-full overflow-hidden"><img class="w-full h-full object-cover" src="${entry.photo}"></div>` : ''}
+            <div class="p-4">
+                <div class="flex justify-between items-start mb-2 ${entry.photo ? '' : 'pr-20'}">
+                    <h4 class="font-bold text-white text-lg leading-tight">${entry.title}</h4>
+                    ${entry.photo ? '' : `<span class="text-xs text-gray-400 whitespace-nowrap">${relativeDateLabel(entry.date)}</span>`}
+                </div>
+                ${entry.photo ? `<p class="text-xs text-gray-400 mb-2">${relativeDateLabel(entry.date)}</p>` : ''}
+                ${entry.note ? `<p class="text-sm text-gray-300 italic">"${entry.note}"</p>` : ''}
+                <div class="mt-3 flex items-center gap-2">
+                    <span class="${entry.done ? 'bg-primary/20 text-primary' : 'bg-slate-700 text-gray-300'} text-xs px-2 py-1 rounded-md">
+                        <i class="fa-solid ${entry.done ? 'fa-check' : 'fa-clock'} mr-1"></i>${entry.done ? t('completed') : t('markPlanned')}
+                    </span>
+                    ${entry.mate ? `<span class="bg-slate-700 text-gray-300 text-xs px-2 py-1 rounded-md"><i class="fa-solid fa-user-group mr-1"></i>${t('withMate')} ${entry.mate}</span>` : ''}
+                </div>
+            </div>`;
+        container.appendChild(card);
+    });
+}
+
+/* ---------- Entry detail modal ---------- */
+let activeEntryId = null;
+let modalDraft = null;
+
+function openModal(entryId) {
+    const entry = log.find(e => e.id === entryId);
+    if (!entry) return;
+    activeEntryId = entryId;
+    modalDraft = { ...entry };
+    document.getElementById('modal-challenge-title').textContent = entry.title;
+    document.getElementById('modal-challenge-date').textContent = relativeDateLabel(entry.date);
+    document.getElementById('modal-note').value = entry.note || '';
+    renderModalStars();
+    renderModalDoneToggle();
+    renderModalPhoto();
+    document.getElementById('entry-modal').classList.add('open');
+}
+function closeModal() {
+    document.getElementById('entry-modal').classList.remove('open');
+    activeEntryId = null; modalDraft = null;
+}
+function renderModalStars() {
+    const el = document.getElementById('modal-stars');
+    el.innerHTML = '';
+    for (let i = 1; i <= 5; i++) {
+        const star = document.createElement('i');
+        star.className = `star-btn ${i <= modalDraft.rating ? 'fa-solid' : 'fa-regular'} fa-star ${i <= modalDraft.rating ? 'text-yellow-400' : 'text-gray-600'}`;
+        star.onclick = () => { modalDraft.rating = i; renderModalStars(); };
+        el.appendChild(star);
+    }
+}
+function renderModalDoneToggle() {
+    const btn = document.getElementById('modal-done-toggle');
+    btn.textContent = modalDraft.done ? t('markDone') : t('markPlanned');
+    btn.className = `px-4 py-2 rounded-full text-xs font-bold ${modalDraft.done ? 'bg-primary text-dark' : 'bg-slate-700 text-gray-300'}`;
+}
+function toggleModalDone() { modalDraft.done = !modalDraft.done; renderModalDoneToggle(); }
+function renderModalPhoto() {
+    const el = document.getElementById('modal-photo-preview');
+    el.innerHTML = modalDraft.photo
+        ? `<img src="${modalDraft.photo}" class="w-full h-full object-cover">`
+        : `<i class="fa-solid fa-camera text-gray-500 text-2xl"></i>`;
+}
+function onModalPhotoChange(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => { modalDraft.photo = e.target.result; renderModalPhoto(); };
+    reader.readAsDataURL(file);
+}
+function saveModalEntry() {
+    if (!modalDraft) return;
+    modalDraft.note = document.getElementById('modal-note').value;
+    const idx = log.findIndex(e => e.id === activeEntryId);
+    if (idx >= 0) log[idx] = modalDraft;
+    DB.set('cm_log', log);
+    showToast(t('toastSaved'));
+    closeModal();
+    renderAll();
+}
+function deleteModalEntry() {
+    log = log.filter(e => e.id !== activeEntryId);
+    DB.set('cm_log', log);
+    showToast(t('toastDeleted'));
+    closeModal();
+    renderAll();
+}
+
+/* ---------- Stats tab ---------- */
+function computeStreak() {
+    const days = new Set(log.filter(e => e.done).map(e => new Date(e.date).toDateString()));
+    let streak = 0;
+    let cursor = new Date();
+    while (days.has(cursor.toDateString())) {
+        streak++;
+        cursor.setDate(cursor.getDate() - 1);
+    }
+    return streak;
+}
+function renderStats() {
+    const completed = log.filter(e => e.done);
+    document.getElementById('stat-total').textContent = completed.length;
+    document.getElementById('stat-streak').textContent = computeStreak();
+
+    // Rating distribution
+    const counts = [0, 0, 0, 0, 0];
+    log.forEach(e => { if (e.rating >= 1 && e.rating <= 5) counts[e.rating - 1]++; });
+    const ratingDistEl = document.getElementById('chart-ratings');
+    if (window.Plotly) {
+        Plotly.newPlot(ratingDistEl, [{
+            x: ['1★', '2★', '3★', '4★', '5★'], y: counts, type: 'bar',
+            marker: { color: '#a3e635' }
+        }], {
+            paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+            font: { color: '#cbd5e1', size: 11 },
+            margin: { t: 10, b: 30, l: 30, r: 10 },
+            yaxis: { gridcolor: '#334155' }, xaxis: { gridcolor: '#334155' }
+        }, { displayModeBar: false, responsive: true });
+
+        // Timeline last 14 days
+        const labels = [], values = [];
+        for (let i = 13; i >= 0; i--) {
+            const d = new Date(); d.setDate(d.getDate() - i);
+            labels.push(d.toLocaleDateString(LANG === 'ru' ? 'ru-RU' : 'en-US', { day: 'numeric', month: 'short' }));
+            const count = completed.filter(e => new Date(e.date).toDateString() === d.toDateString()).length;
+            values.push(count);
+        }
+        Plotly.newPlot(document.getElementById('chart-timeline'), [{
+            x: labels, y: values, type: 'scatter', mode: 'lines+markers',
+            line: { color: '#22c55e', shape: 'spline' }, marker: { color: '#a3e635' }
+        }], {
+            paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+            font: { color: '#cbd5e1', size: 10 },
+            margin: { t: 10, b: 40, l: 30, r: 10 },
+            yaxis: { gridcolor: '#334155' }, xaxis: { gridcolor: '#334155', tickangle: -45 }
+        }, { displayModeBar: false, responsive: true });
+    }
+
+    // Top rated
+    const topList = document.getElementById('top-rated-list');
+    const topEmpty = document.getElementById('top-rated-empty');
+    const top = log.filter(e => e.rating >= 4).sort((a, b) => b.rating - a.rating).slice(0, 5);
+    topList.innerHTML = '';
+    if (!top.length) { topEmpty.classList.remove('hidden'); }
+    else {
+        topEmpty.classList.add('hidden');
+        top.forEach(e => {
+            const row = document.createElement('div');
+            row.className = 'glass-panel rounded-xl p-3 flex items-center justify-between';
+            row.innerHTML = `<span class="text-sm font-medium text-white">${e.title}</span><span class="text-xs">${starsHtml(e.rating)}</span>`;
+            topList.appendChild(row);
+        });
+    }
+}
+
+/* ---------- Profile tab ---------- */
+function renderProfile() {
+    document.getElementById('profile-name').value = profile.name || '';
+    document.getElementById('profile-status').value = profile.status || '';
+    const avatarUrl = profile.avatar || 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-4.jpg';
+    document.getElementById('profile-avatar-big').src = avatarUrl;
+    document.getElementById('header-avatar').src = avatarUrl;
+
+    const completed = log.filter(e => e.done);
+    const rated = log.filter(e => e.rating > 0);
+    const avg = rated.length ? (rated.reduce((s, e) => s + e.rating, 0) / rated.length) : 0;
+    document.getElementById('profile-total').textContent = completed.length;
+    document.getElementById('profile-avg').textContent = avg.toFixed(1);
+    document.getElementById('profile-streak').textContent = computeStreak();
+
+    const favEl = document.getElementById('profile-fav-value');
+    const fav = [...log].sort((a, b) => (b.rating || 0) - (a.rating || 0))[0];
+    favEl.textContent = (fav && fav.rating) ? `${fav.title} (${fav.rating}★)` : t('noFavorite');
+}
+document.getElementById('profile-name').addEventListener('input', e => { profile.name = e.target.value; DB.set('cm_profile', profile); });
+document.getElementById('profile-status').addEventListener('input', e => {
+    profile.status = e.target.value; DB.set('cm_profile', profile);
+});
+function onAvatarChange(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+        profile.avatar = e.target.result;
+        DB.set('cm_profile', profile);
+        renderProfile();
+    };
+    reader.readAsDataURL(file);
+}
+
+/* ---------- Render all ---------- */
+function renderAll() {
+    applyStaticText();
+    renderChallenges();
+    renderLog();
+    renderStats();
+    renderProfile();
+}
+
+/* ---------- Init ---------- */
+document.addEventListener('DOMContentLoaded', renderAll);
+window.addEventListener('load', () => setTimeout(renderAll, 50));
+</script>
+
+  <script>
+    (function() {
+      function blockEvent(e) {
+        if (!e) return false;
+        if (typeof e.preventDefault === 'function') e.preventDefault();
+        if (typeof e.stopPropagation === 'function') e.stopPropagation();
+        if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+        return false;
+      }
+      document.addEventListener('click', function(e) {
+        var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+        if (!a) return;
+        return blockEvent(e);
+      }, true);
+      try { window.open = function() { return null }; } catch (_) {}
+      try {
+        var noop = function(){};
+        history.pushState = noop;
+        history.replaceState = noop;
+      } catch (_) {}
+      try {
+        if (window.location) {
+          window.location.assign = function(){};
+          window.location.replace = function(){};
+        }
+      } catch (_) {}
+    })();
+  </script>
+<script>(function() {
+  function _uxpResizeCharts() {
+    if (window.Plotly) {
+      document.querySelectorAll('.plot-container.plotly').forEach(function(pc) {
+        var gd = pc.parentElement;
+        if (!gd) return;
+        var rect = gd.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return;
+        try { window.Plotly.relayout(gd, { width: Math.round(rect.width), height: Math.round(rect.height) }); } catch(e) {}
+      });
+    }
+    if (window.ApexCharts && window.Apex && window.Apex._chartInstances) {
+      window.Apex._chartInstances.forEach(function(inst) {
+        try { (inst.chart || inst).updateOptions({}, false, false); } catch(e) {}
+      });
+    }
+    if (window.Chart) {
+      try { Object.values(window.Chart.instances || {}).forEach(function(c) { c.resize(); }); } catch(e) {}
+    }
+  }
+
+  window.addEventListener('load', function() {
+    setTimeout(function() { _uxpResizeCharts(); setTimeout(_uxpResizeCharts, 500); }, 300);
+    try {
+      var _lastW = 0, _lastH = 0, _timer = 0;
+      new ResizeObserver(function() {
+        var w = document.documentElement.clientWidth;
+        var h = document.documentElement.clientHeight;
+        if (w === _lastW && h === _lastH) return;
+        _lastW = w; _lastH = h;
+        clearTimeout(_timer);
+        _timer = setTimeout(_uxpResizeCharts, 150);
+      }).observe(document.documentElement);
+    } catch(e) {}
+  });
+})();</script>
+</body>
+</html>
